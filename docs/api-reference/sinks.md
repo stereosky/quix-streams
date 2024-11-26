@@ -1124,3 +1124,104 @@ A connector to sink topic data to PostgreSQL.
 - `ddl_timeout`: Timeout for DDL operations such as table creation or schema updates.
 - `kwargs`: Additional parameters for `psycopg2.connect`.
 
+<a id="quixstreams.sinks.community.kinesis"></a>
+
+## quixstreams.sinks.community.kinesis
+
+<a id="quixstreams.sinks.community.kinesis.KinesisStreamNotFoundError"></a>
+
+### KinesisStreamNotFoundError
+
+```python
+class KinesisStreamNotFoundError(Exception)
+```
+
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/sinks/community/kinesis.py#L23)
+
+Raised when the specified Kinesis stream does not exist.
+
+<a id="quixstreams.sinks.community.kinesis.KinesisSink"></a>
+
+### KinesisSink
+
+```python
+class KinesisSink(BaseSink)
+```
+
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/sinks/community/kinesis.py#L27)
+
+<a id="quixstreams.sinks.community.kinesis.KinesisSink.__init__"></a>
+
+<br><br>
+
+#### KinesisSink.\_\_init\_\_
+
+```python
+def __init__(stream_name: str,
+             aws_access_key_id: Optional[str] = getenv("AWS_ACCESS_KEY_ID"),
+             aws_secret_access_key: Optional[str] = getenv(
+                 "AWS_SECRET_ACCESS_KEY"),
+             region_name: Optional[str] = getenv("AWS_REGION",
+                                                 getenv("AWS_DEFAULT_REGION")),
+             value_serializer: Callable[[Any], str] = json.dumps,
+             key_serializer: Callable[[Any], str] = bytes.decode,
+             **kwargs) -> None
+```
+
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/sinks/community/kinesis.py#L28)
+
+Initialize the KinesisSink.
+
+
+<br>
+***Arguments:***
+
+- `stream_name`: Kinesis stream name.
+- `aws_access_key_id`: AWS access key ID.
+- `aws_secret_access_key`: AWS secret access key.
+- `region_name`: AWS region name (e.g., 'us-east-1').
+- `value_serializer`: Function to serialize the value to string
+(defaults to json.dumps).
+- `key_serializer`: Function to serialize the key to string
+(defaults to bytes.decode).
+- `kwargs`: Additional keyword arguments passed to boto3.client.
+
+<a id="quixstreams.sinks.community.kinesis.KinesisSink.add"></a>
+
+<br><br>
+
+#### KinesisSink.add
+
+```python
+def add(value: Any, key: Any, timestamp: int,
+        headers: list[tuple[str, HeaderValue]], topic: str, partition: int,
+        offset: int) -> None
+```
+
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/sinks/community/kinesis.py#L80)
+
+Buffer a record for the Kinesis stream.
+
+Records are buffered until the batch size reaches 500, at which point
+they are sent immediately. If the batch size is less than 500, records
+will be sent when the flush method is called.
+
+<a id="quixstreams.sinks.community.kinesis.KinesisSink.flush"></a>
+
+<br><br>
+
+#### KinesisSink.flush
+
+```python
+def flush(topic: str, partition: int) -> None
+```
+
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/sinks/community/kinesis.py#L110)
+
+Flush all buffered records for a given topic-partition.
+
+This method sends any outstanding records that have not yet been sent
+because the batch size was less than 500. It waits for all futures to
+complete, ensuring that all records are successfully sent to the Kinesis
+stream.
+
