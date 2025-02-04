@@ -6514,7 +6514,7 @@ stores the expiration index to delete expired windows.
 class WindowedRocksDBPartitionTransaction(PartitionTransaction)
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/transaction.py#L46)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/transaction.py#L50)
 
 <a id="quixstreams.state.rocksdb.windowed.transaction.WindowedRocksDBPartitionTransaction.expire_windows"></a>
 
@@ -6529,7 +6529,7 @@ def expire_windows(
         end_inclusive: bool = False) -> list[tuple[tuple[int, int], Any]]
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/transaction.py#L154)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/transaction.py#L194)
 
 Get all expired windows from RocksDB up to the specified `max_start_time` timestamp.
 
@@ -6575,7 +6575,7 @@ def delete_windows(max_start_time: int, delete_values: bool,
                    prefix: bytes) -> None
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/transaction.py#L254)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/transaction.py#L294)
 
 Delete windows from RocksDB up to the specified `max_start_time` timestamp.
 
@@ -6610,7 +6610,7 @@ def get_windows(start_from_ms: int,
                 backwards: bool = False) -> list[tuple[tuple[int, int], Any]]
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/transaction.py#L345)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/transaction.py#L349)
 
 Get all windows within the specified time range.
 
@@ -6725,10 +6725,10 @@ bytes
 ### WindowedTransactionState
 
 ```python
-class WindowedTransactionState(WindowedState)
+class WindowedTransactionState(TransactionState, WindowedState)
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L9)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L10)
 
 <a id="quixstreams.state.rocksdb.windowed.state.WindowedTransactionState.__init__"></a>
 
@@ -6739,7 +6739,7 @@ def __init__(transaction: "WindowedRocksDBPartitionTransaction",
              prefix: bytes)
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L12)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L13)
 
 A windowed state to be provided into `StreamingDataFrame` window functions.
 
@@ -6757,7 +6757,7 @@ def get_window(start_ms: int,
                default: Any = None) -> Optional[Any]
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L23)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L24)
 
 Get the value of the window defined by `start` and `end` timestamps
 
@@ -6782,7 +6782,7 @@ def update_window(start_ms: int, end_ms: int, value: Any,
                   timestamp_ms: int) -> None
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L39)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L40)
 
 Set a value for the window.
 
@@ -6801,10 +6801,10 @@ using the provided `timestamp_ms`.
 #### WindowedTransactionState.add\_to\_collection
 
 ```python
-def add_to_collection(value: Any, timestamp_ms: int) -> None
+def add_to_collection(value: Any, id: Optional[int]) -> int
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L65)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L66)
 
 Collect a value for collection-type window aggregations.
 
@@ -6817,6 +6817,45 @@ during window expiration.
 - `value`: value to be collected
 - `timestamp_ms`: current message timestamp in milliseconds
 
+<a id="quixstreams.state.rocksdb.windowed.state.WindowedTransactionState.get_from_collection"></a>
+
+#### WindowedTransactionState.get\_from\_collection
+
+```python
+def get_from_collection(start: int, end: int) -> list[Any]
+```
+
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L83)
+
+Return all values from a collection-type window aggregation.
+
+**Arguments**:
+
+- `start`: starting id of values to fetch (inclusive)
+- `end`: end id of values to fetch (exclusive)
+
+<a id="quixstreams.state.rocksdb.windowed.state.WindowedTransactionState.delete_from_collection"></a>
+
+#### WindowedTransactionState.delete\_from\_collection
+
+```python
+def delete_from_collection(end: int) -> None
+```
+
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L94)
+
+Delete collected values with id less than end.
+
+This method maintains a deletion index to track progress and avoid
+re-scanning previously deleted values. It:
+1. Retrieves the last deleted id from the cache
+2. Scans values from last deleted id up to end
+3. Updates the deletion index with the latest deleted id
+
+**Arguments**:
+
+- `end`: Delete values with id less than this value
+
 <a id="quixstreams.state.rocksdb.windowed.state.WindowedTransactionState.get_latest_timestamp"></a>
 
 #### WindowedTransactionState.get\_latest\_timestamp
@@ -6825,7 +6864,7 @@ during window expiration.
 def get_latest_timestamp() -> Optional[int]
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L82)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L108)
 
 Get the latest observed timestamp for the current message key.
 
@@ -6848,7 +6887,7 @@ def expire_windows(
         end_inclusive: bool = False) -> list[tuple[tuple[int, int], Any]]
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L94)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L120)
 
 Get all expired windows from RocksDB up to the specified `max_start_time` timestamp.
 
@@ -6877,7 +6916,7 @@ def get_windows(start_from_ms: int,
                 backwards: bool = False) -> list[tuple[tuple[int, int], Any]]
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L122)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L148)
 
 Get all windows that start between "start_from_ms" and "start_to_ms".
 
@@ -6899,7 +6938,7 @@ A sorted list of tuples in the format `((start, end), value)`.
 def delete_windows(max_start_time: int, delete_values: bool) -> None
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L140)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/rocksdb/windowed/state.py#L166)
 
 Delete windows from RocksDB up to the specified `max_start_time` timestamp.
 
@@ -7757,6 +7796,82 @@ class WindowedState(Protocol)
 
 A windowed state to be provided into `StreamingDataFrame` window functions.
 
+<a id="quixstreams.state.types.WindowedState.get"></a>
+
+#### WindowedState.get
+
+```python
+def get(key: Any, default: Any = None) -> Optional[Any]
+```
+
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L12)
+
+Get the value for key if key is present in the state, else default
+
+**Arguments**:
+
+- `key`: key
+- `default`: default value to return if the key is not found
+
+**Returns**:
+
+value or None if the key is not found and `default` is not provided
+
+<a id="quixstreams.state.types.WindowedState.set"></a>
+
+#### WindowedState.set
+
+```python
+def set(key: Any, value: Any)
+```
+
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L22)
+
+Set value for the key.
+
+**Arguments**:
+
+- `key`: key
+- `value`: value
+
+<a id="quixstreams.state.types.WindowedState.delete"></a>
+
+#### WindowedState.delete
+
+```python
+def delete(key: Any)
+```
+
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L30)
+
+Delete value for the key.
+
+This function always returns `None`, even if value is not found.
+
+**Arguments**:
+
+- `key`: key
+
+<a id="quixstreams.state.types.WindowedState.exists"></a>
+
+#### WindowedState.exists
+
+```python
+def exists(key: Any) -> bool
+```
+
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L39)
+
+Check if the key exists in state.
+
+**Arguments**:
+
+- `key`: key
+
+**Returns**:
+
+True if key exists, False otherwise
+
 <a id="quixstreams.state.types.WindowedState.get_window"></a>
 
 #### WindowedState.get\_window
@@ -7767,7 +7882,7 @@ def get_window(start_ms: int,
                default: Any = None) -> Optional[Any]
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L12)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L47)
 
 Get the value of the window defined by `start` and `end` timestamps
 
@@ -7791,7 +7906,7 @@ value or None if the key is not found and `default` is not provided
 def update_window(start_ms: int, end_ms: int, value: Any, timestamp_ms: int)
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L26)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L61)
 
 Set a value for the window.
 
@@ -7810,10 +7925,10 @@ using the provided `timestamp_ms`.
 #### WindowedState.add\_to\_collection
 
 ```python
-def add_to_collection(value: Any, timestamp_ms: int) -> None
+def add_to_collection(value: Any, id: Optional[int]) -> int
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L46)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L81)
 
 Collect a value for collection-type window aggregations.
 
@@ -7824,7 +7939,50 @@ during window expiration.
 **Arguments**:
 
 - `value`: value to be collected
-- `timestamp_ms`: current message timestamp in milliseconds
+- `id`: current message ID, for example timestamp in milliseconds, does not have to be unique.
+
+**Returns**:
+
+the message ID, auto-generated if not provided
+
+<a id="quixstreams.state.types.WindowedState.get_from_collection"></a>
+
+#### WindowedState.get\_from\_collection
+
+```python
+def get_from_collection(start: int, end: int) -> list[Any]
+```
+
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L96)
+
+Return all values from a collection-type window aggregation.
+
+**Arguments**:
+
+- `start`: starting id of values to fetch (inclusive)
+- `end`: end id of values to fetch (exclusive)
+
+<a id="quixstreams.state.types.WindowedState.delete_from_collection"></a>
+
+#### WindowedState.delete\_from\_collection
+
+```python
+def delete_from_collection(end: int) -> None
+```
+
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L105)
+
+Delete collected values with id less than end.
+
+This method maintains a deletion index to track progress and avoid
+re-scanning previously deleted values. It:
+1. Retrieves the last deleted id from the cache
+2. Scans values from last deleted id up to end
+3. Updates the deletion index with the latest deleted id
+
+**Arguments**:
+
+- `end`: Delete values with id less than this value
 
 <a id="quixstreams.state.types.WindowedState.get_latest_timestamp"></a>
 
@@ -7834,7 +7992,7 @@ during window expiration.
 def get_latest_timestamp() -> Optional[int]
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L59)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L119)
 
 Get the latest observed timestamp for the current state partition.
 
@@ -7857,7 +8015,7 @@ def expire_windows(
         end_inclusive: bool = False) -> list[tuple[tuple[int, int], Any]]
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L70)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L130)
 
 Get all expired windows from RocksDB up to the specified `max_start_time` timestamp.
 
@@ -7884,7 +8042,7 @@ A sorted list of tuples in the format `((start, end), value)`.
 def delete_windows(max_start_time: int, delete_values: bool) -> None
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L92)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L152)
 
 Delete windows from RocksDB up to the specified `max_start_time` timestamp.
 
@@ -7908,7 +8066,7 @@ def get_windows(start_from_ms: int,
                 backwards: bool = False) -> list[tuple[tuple[int, int], Any]]
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L106)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L166)
 
 Get all windows that start between "start_from_ms" and "start_to_ms".
 
@@ -7930,7 +8088,7 @@ A sorted list of tuples in the format `((start, end), value)`.
 class WindowedPartitionTransaction(Protocol)
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L120)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L180)
 
 <a id="quixstreams.state.types.WindowedPartitionTransaction.failed"></a>
 
@@ -7941,7 +8099,7 @@ class WindowedPartitionTransaction(Protocol)
 def failed() -> bool
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L122)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L182)
 
 Return `True` if transaction failed to update data at some point.
 
@@ -7960,7 +8118,7 @@ bool
 def completed() -> bool
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L132)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L192)
 
 Return `True` if transaction is successfully completed.
 
@@ -7979,7 +8137,7 @@ bool
 def prepared() -> bool
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L142)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L202)
 
 Return `True` if transaction is prepared completed.
 
@@ -7997,7 +8155,7 @@ bool
 def prepare(processed_offset: Optional[int])
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L151)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L211)
 
 Produce changelog messages to the changelog topic for all changes accumulated
 
@@ -8025,7 +8183,7 @@ def get_window(start_ms: int,
                default: Any = None) -> Optional[Any]
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L168)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L228)
 
 Get the value of the window defined by `start` and `end` timestamps
 
@@ -8051,7 +8209,7 @@ def update_window(start_ms: int, end_ms: int, value: Any, timestamp_ms: int,
                   prefix: bytes)
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L187)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L247)
 
 Set a value for the window.
 
@@ -8071,10 +8229,10 @@ using the provided `timestamp`.
 #### WindowedPartitionTransaction.add\_to\_collection
 
 ```python
-def add_to_collection(value: Any, timestamp_ms: int) -> None
+def add_to_collection(value: Any, id: Optional[int]) -> int
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L204)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L264)
 
 Collect a value for collection-type window aggregations.
 
@@ -8085,7 +8243,50 @@ during window expiration.
 **Arguments**:
 
 - `value`: value to be collected
-- `timestamp_ms`: current message timestamp in milliseconds
+- `id`: current message ID (for example, timestamp in milliseconds)
+
+**Returns**:
+
+the message ID, auto-generated if not provided
+
+<a id="quixstreams.state.types.WindowedPartitionTransaction.get_from_collection"></a>
+
+#### WindowedPartitionTransaction.get\_from\_collection
+
+```python
+def get_from_collection(start: int, end: int) -> list[Any]
+```
+
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L279)
+
+Return all values from a collection-type window aggregation.
+
+**Arguments**:
+
+- `start`: starting id of values to fetch (inclusive)
+- `end`: end id of values to fetch (exclusive)
+
+<a id="quixstreams.state.types.WindowedPartitionTransaction.delete_from_collection"></a>
+
+#### WindowedPartitionTransaction.delete\_from\_collection
+
+```python
+def delete_from_collection(end: int) -> None
+```
+
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L288)
+
+Delete collected values with id less than end.
+
+This method maintains a deletion index to track progress and avoid
+re-scanning previously deleted values. It:
+1. Retrieves the last deleted id from the cache
+2. Scans values from last deleted id up to end
+3. Updates the deletion index with the latest deleted id
+
+**Arguments**:
+
+- `end`: Delete values with id less than this value
 
 <a id="quixstreams.state.types.WindowedPartitionTransaction.get_latest_timestamp"></a>
 
@@ -8095,7 +8296,7 @@ during window expiration.
 def get_latest_timestamp(prefix: bytes) -> int
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L217)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L302)
 
 Get the latest observed timestamp for the current state prefix
 
@@ -8121,7 +8322,7 @@ def expire_windows(
         end_inclusive: bool = False) -> list[tuple[tuple[int, int], Any]]
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L229)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L314)
 
 Get all expired windows from RocksDB up to the specified `max_start_time` timestamp.
 
@@ -8150,7 +8351,7 @@ def delete_windows(max_start_time: int, delete_values: bool,
                    prefix: bytes) -> None
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L253)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L338)
 
 Delete windows from RocksDB up to the specified `max_start_time` timestamp.
 
@@ -8176,7 +8377,7 @@ def get_windows(start_from_ms: int,
                 backwards: bool = False) -> list[tuple[tuple[int, int], Any]]
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L270)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L355)
 
 Get all windows that start between "start_from_ms" and "start_to_ms"
 
@@ -8202,7 +8403,7 @@ def flush(processed_offset: Optional[int] = None,
           changelog_offset: Optional[int] = None)
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L289)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L374)
 
 Flush the recent updates to the storage.
 
@@ -8221,7 +8422,7 @@ optional.
 def changelog_topic_partition() -> Optional[Tuple[str, int]]
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L303)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L388)
 
 Return the changelog topic-partition for the StorePartition of this transaction.
 
@@ -8239,7 +8440,7 @@ Returns `None` if changelog_producer is not provided.
 class PartitionRecoveryTransaction(Protocol)
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L317)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L402)
 
 A class for managing recovery for a StorePartition from a changelog message
 
@@ -8251,7 +8452,7 @@ A class for managing recovery for a StorePartition from a changelog message
 def flush()
 ```
 
-[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L324)
+[[VIEW SOURCE]](https://github.com/quixio/quix-streams/blob/main/quixstreams/state/types.py#L409)
 
 Flush the recovery update to the storage.
 
